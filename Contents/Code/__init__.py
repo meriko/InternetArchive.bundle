@@ -25,7 +25,7 @@ def MainMenu():
         DirectoryObject(
             key = 
                 Callback(
-                    Categories,
+                    Subcollections,
                     url = BASE_URL + '/details/movies',
                     title = title,
                     video = True
@@ -41,7 +41,7 @@ def MainMenu():
         DirectoryObject(
             key = 
                 Callback(
-                    Categories,
+                    Subcollections,
                     url = BASE_URL + '/details/audio',
                     title = title,
                     video = False
@@ -63,34 +63,7 @@ def MainMenu():
     )
     
     return oc
-
-##########################################################################################
-@route(PREFIX + '/Categories', video = bool)
-def Categories(url, title, video):
-    oc = ObjectContainer(title2 = title)
     
-    pageElement = HTML.ElementFromURL(url)
-
-    for item in pageElement.xpath("//td[@class='level2Header']//a"):      
-        link  = BASE_URL + item.xpath("./@href")[0]            
-        title = item.xpath("./text()")[0]
-            
-        oc.add(
-            DirectoryObject(
-                key = 
-                    Callback(
-                        Subcollections,
-                        url = link,
-                        title = title,
-                        video = video
-                    ),
-                title = title,
-                thumb = R(ICON)
-           )
-        )
-        
-    return oc
-        
 ##########################################################################################
 @route(PREFIX + '/Subcollections', video = bool)
 def Subcollections(url, title, video):
@@ -394,5 +367,4 @@ def Search(query, title):
     )
     
     return oc
-
 
