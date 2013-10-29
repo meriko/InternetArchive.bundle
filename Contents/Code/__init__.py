@@ -28,7 +28,8 @@ def MainMenu():
                     Subcollections,
                     url = BASE_URL + '/details/movies',
                     title = title,
-                    video = True
+                    video = True,
+                    thumb = R(ICON)
                 ),
             title = title,
             thumb = R(ICON),
@@ -44,7 +45,8 @@ def MainMenu():
                     Subcollections,
                     url = BASE_URL + '/details/audio',
                     title = title,
-                    video = False
+                    video = False,
+                    thumb = R(ICON)
                 ),
             title = title,
             thumb = R(ICON),
@@ -52,22 +54,197 @@ def MainMenu():
         )
     )
     
+    title = "Favorites"
+    oc.add(
+        DirectoryObject(
+            key = 
+                Callback(
+                    Favorites
+                ),
+            title = title,
+            thumb = R(ICON),
+            summary = "All your favorites gathered for fast access"                    
+        )
+    )
+    
     title = "Search"
     oc.add(
         InputDirectoryObject(
-            key = Callback(Search, title = title),
+            key =
+                Callback(
+                    Search,
+                    title = title
+                ),
             title  = title,
             prompt = title,
+            thumb = R(ICON),
+            summary = 'Search the Internet Archive'
+        )
+    )
+    
+    return oc
+
+##########################################################################################
+@route(PREFIX + '/Favorites')
+def Favorites():
+    if not Dict:
+        return ObjectContainer(
+            header = "No favorites found",
+            message = "After adding favorites, they will show up here"
+        )
+    
+    oc = ObjectContainer(title2 = 'Favorites', no_cache = True)
+    
+    title = "Manage Favorites"
+    oc.add(
+        DirectoryObject(
+            key = 
+                Callback(
+                    ManageFavorites
+                ),
+            title = title,
+            thumb = R(ICON),
+            summary = "Delete or rename your favorites"                    
+        )
+    )
+    
+    for key in Dict:
+        item = Dict[key]
+
+        if item['type'] == 0:
+           oc.add(
+                DirectoryObject(
+                    key =
+                        Callback(
+                            Subcollections,
+                            url = item['url'],
+                            title = item['title'],
+                            video = item['video'],
+                            thumb = item['thumb'],
+                            summary = item['summary']
+                        ),
+                    title = item['title'],
+                    thumb = item['thumb'],
+                    summary = item['summary']
+                )
+            )
+        elif item['type'] == 1:
+            oc.add(
+                DirectoryObject(
+                    key =
+                        Callback(
+                            Items,
+                            url = item['url'],
+                            title = item['title'],
+                            video = item['video'],
+                            thumb = item['thumb'],
+                            summary = item['summary']
+                        ),
+                    title = item['title'],
+                    thumb = item['thumb'],
+                    summary = item['summary']
+                )
+            )
+        elif item['type'] == 2:
+            if item['video']:   
+                oc.add(
+                    VideoClipObject(
+                        url = item['url'],
+                        title = item['title'],
+                        summary = item['summary'],
+                        thumb = item['thumb']
+                    )
+                )
+            else:
+                oc.add(
+                    AlbumObject(
+                        url = item['url'],
+                        title = item['title'],
+                        summary = item['summary'],
+                        thumb = item['thumb']                 
+                    )
+                )
+        
+    return oc
+    
+##########################################################################################
+@route(PREFIX + '/ManageFavorites')
+def ManageFavorites():
+    if not Dict:
+        return ObjectContainer(
+            header = "No favorites found",
+            message = "Nothing to manage"
+        )
+    
+    oc = ObjectContainer(title2 = 'Manage Favorites', no_cache = True)
+    
+    for key in Dict:
+        item = Dict[key]
+
+        oc.add(
+            DirectoryObject(
+                key =
+                    Callback(
+                        ManageChoice,
+                        key = key
+                    ),
+                title = item['title'],
+                thumb = R(ICON),
+                summary = "Delete or rename " + item['title']
+            )
+        )
+    
+    return oc
+
+##########################################################################################
+@route(PREFIX + '/Search', video = bool, offset = int)
+def Search(query, title):
+    oc = ObjectContainer(title2 = title)
+    
+    searchURLMovies = BASE_URL + '/search.php?query=' + String.Quote(query) + '%20AND%20mediatype%3Amovies'
+    searchURLAudio  = BASE_URL + '/search.php?query=' + String.Quote(query) + '%20AND%20mediatype%3Aaudio'
+    
+    title = "Results for '%s' in Moving Image Archive" % query
+    oc.add(
+        DirectoryObject(
+            key =
+                Callback(
+                    Items,
+                    url = searchURLMovies,
+                    title = title, 
+                    video = True
+                ),
+            title = title,
+            thumb = R(ICON)
+        )
+    )
+    
+    title = "Results for '%s' in Audio Archive" % query
+    oc.add(
+        DirectoryObject(
+            key =
+                Callback(
+                    Items,
+                    url = searchURLAudio,
+                    title = title, 
+                    video = False
+                ),
+            title = title,
             thumb = R(ICON)
         )
     )
     
     return oc
-    
+
 ##########################################################################################
 @route(PREFIX + '/Subcollections', video = bool)
-def Subcollections(url, title, video):
-    oc = ObjectContainer(title2 = title)
+def Subcollections(url, title, video, summary = None, thumb = None):
+    oc = ObjectContainer(title2 = title, no_cache = True)
+    
+    orgTitle = title
+    orgUrl   = url
+    orgThumb = thumb
+    orgDesc  = summary
     
     pageElement = HTML.ElementFromURL(url)
     
@@ -95,24 +272,23 @@ def Subcollections(url, title, video):
             except:
                 desc = None
 
-        if video:   
-            oc.add(
-                VideoClipObject(
-                    url = link + "#video",
-                    title = name,
-                    summary = desc,
-                    thumb = thumb
-                )
+        oc.add(
+            PopupDirectoryObject(
+                key =
+                    Callback(
+                        PlayChoice,
+                        url = link,
+                        title = name,
+                        summary = desc,
+                        thumb = thumb,
+                        video = video
+                    ),
+                title = name,
+                summary = desc,
+                thumb = thumb
             )
-        else:
-            oc.add(
-                AlbumObject(
-                    url = link,
-                    title = name,
-                    summary = desc,
-                    thumb = thumb                   
-                )
-            )           
+        )
+          
     except:
         pass
 
@@ -140,7 +316,7 @@ def Subcollections(url, title, video):
             
         try:
             itemCount = item.xpath(".//nobr/text()")[0]
-            title     = title + " (" + itemCount + ")"
+            extra     = " (" + itemCount + ")"
         except:
             pass
         
@@ -151,9 +327,11 @@ def Subcollections(url, title, video):
                         Subcollections,
                         url = url,
                         title = title,
-                        video = video
+                        video = video,
+                        summary = desc,
+                        thumb = thumb
                     ),
-                title = title,
+                title = title + extra,
                 summary = desc,
                 thumb = thumb,
             )
@@ -174,13 +352,14 @@ def Subcollections(url, title, video):
                     DirectoryObject(
                         key =
                             Callback(
-                                Objects,
+                                Items,
                                 url = url,
-                                title = title,
+                                title = title + ' ' + choice,
                                 video = video,
+                                thumb = orgThumb
                             ),
                         title = choice,
-                        thumb = R(ICON)
+                        thumb = orgThumb
                     )
                 )           
 
@@ -188,13 +367,38 @@ def Subcollections(url, title, video):
     if len(oc) < 1:
         oc.header  = "Sorry"
         oc.message = "Could not find any content"
+    else:
+        if not orgUrl in Dict:
+            oc.objects.insert(
+                0,
+                DirectoryObject(
+                    key = 
+                        Callback(
+                            AddFavorite,
+                            url = orgUrl,
+                            title = orgTitle,
+                            video = video,
+                            type = 0,
+                            summary = orgDesc,
+                            thumb = orgThumb
+                        ),
+                    title = 'Add to Favorites',
+                    thumb = orgThumb,
+                    summary = 'Add this section to Favorites'
+                )
+            )
         
     return oc
 
 ##########################################################################################
-@route(PREFIX + '/Objects', video = bool, offset = int)
-def Objects(url, title, video, offset = 0):
-    oc = ObjectContainer(title2 = title)
+@route(PREFIX + '/Items', video = bool, offset = int)
+def Items(url, title, video, offset = 0, summary = None, thumb = None):
+    oc = ObjectContainer(title2 = title, no_cache = True)
+    
+    orgTitle = title
+    orgUrl   = url
+    orgDesc  = summary
+    orgThumb = thumb
     
     pageElement = HTML.ElementFromURL(url)
         
@@ -226,24 +430,22 @@ def Objects(url, title, video, offset = 0):
         
         title = title.strip().lstrip("[").rstrip("]")
         
-        if video:   
-            oc.add(
-                VideoClipObject(
-                    url = url + "#video",
-                    title = title,
-                    summary = summary,
-                    thumb = thumb
-                )
+        oc.add(
+            PopupDirectoryObject(
+                key =
+                    Callback(
+                        PlayChoice,
+                        url = url,
+                        title = title,
+                        summary = summary,
+                        thumb = thumb,
+                        video = video
+                    ),
+                title = title,
+                summary = summary,
+                thumb = thumb
             )
-        else:
-            oc.add(
-                AlbumObject(
-                    url = url,
-                    title = title,
-                    summary = summary,
-                    thumb = thumb                   
-                )
-            )
+        )
 
     # If no videoclips or audiotracks were found
     # search for browse items(usually originating from "Browse by Subject/Keyword")
@@ -275,7 +477,7 @@ def Objects(url, title, video, offset = 0):
                     DirectoryObject(
                         key =
                             Callback(
-                                Objects,
+                                Items,
                                 url = BASE_URL + ref,
                                 title = title,
                                 video = video
@@ -289,7 +491,7 @@ def Objects(url, title, video, offset = 0):
                         NextPageObject(
                             key = 
                                 Callback(
-                                    Objects,
+                                    Items,
                                     url = url,
                                     title = oc.title2,
                                     video = video,
@@ -298,9 +500,9 @@ def Objects(url, title, video, offset = 0):
                             title = "Next..."
                         )
                     )
-                    return oc
+                    break
     
-    else:
+    else:    
         # Check for pagination
         try:
             for item in pageElement.xpath("//*[@class='pageRow']//a"):
@@ -310,7 +512,7 @@ def Objects(url, title, video, offset = 0):
                         NextPageObject(
                             key = 
                                 Callback(
-                                    Objects,
+                                    Items,
                                     url = url,
                                     title = oc.title2,
                                     video = video
@@ -325,46 +527,214 @@ def Objects(url, title, video, offset = 0):
     if len(oc) < 1:
         oc.header  = "Sorry"
         oc.message = "Could not find any content"
+    elif len(oc) > 1:
+        if not orgUrl in Dict and offset == 0:            
+            oc.objects.insert(
+                0,
+                DirectoryObject(
+                    key = 
+                        Callback(
+                            AddFavorite,
+                            url = orgUrl,
+                            title = orgTitle,
+                            video = video,
+                            type = 1,
+                            summary = orgDesc,
+                            thumb = orgThumb
+                        ),
+                    title = 'Add to Favorites',
+                    thumb = orgThumb,
+                    summary = 'Add this section to Favorites'
+                )
+            )
 
     return oc
 
 ##########################################################################################
-@route(PREFIX + '/Search', video = bool, offset = int)
-def Search(query, title):
-    oc = ObjectContainer(title2 = title)
+@route(PREFIX + '/PlayChoice', video = bool)
+def PlayChoice(url, title, summary, thumb, video):
+    oc = ObjectContainer()
     
-    searchURLMovies = BASE_URL + '/search.php?query=' + String.Quote(query) + '%20AND%20mediatype%3Amovies'
-    searchURLAudio  = BASE_URL + '/search.php?query=' + String.Quote(query) + '%20AND%20mediatype%3Aaudio'
-    
-    title = "Results for '%s' in Moving Image Archive" % query
     oc.add(
         DirectoryObject(
             key =
                 Callback(
-                    Objects,
-                    url = searchURLMovies,
-                    title = title, 
-                    video = True
+                    PlayableObject,
+                    url = url,
+                    title = title,
+                    summary = summary,
+                    thumb = thumb,
+                    video = video
                 ),
-            title = title,
+            title = 'Play',
+        )
+    )
+    
+    oc.add(
+        DirectoryObject(
+            key = 
+                Callback(
+                    AddFavorite,
+                        url = url,
+                        title = title,
+                        video = video,
+                        type = 2,
+                        summary = summary,
+                        thumb = thumb
+                ),
+            title = 'Add to Favorites'
+        )
+    )
+    
+    return oc
+
+##########################################################################################
+@route(PREFIX + '/PlayableObject', video = bool)
+def PlayableObject(url, title, summary, thumb, video):
+    oc = ObjectContainer()
+    
+    if video:   
+        oc.add(
+            VideoClipObject(
+                url = url + "#video",
+                title = title,
+                summary = summary,
+                thumb = thumb
+            )
+        )
+    else:
+        oc.add(
+            AlbumObject(
+                url = url,
+                title = title,
+                summary = summary,
+                thumb = thumb                   
+            )
+        )
+    
+    return oc
+
+##########################################################################################
+@route(PREFIX + '/AddFavorite', video = bool, type = int)
+def AddFavorite(url, title, video, type, summary = None, thumb = None):        
+    Dict[url]            = {}  
+    Dict[url]['title']   = title
+    Dict[url]['url']     = url
+    Dict[url]['summary'] = summary
+    Dict[url]['thumb']   = thumb
+    Dict[url]['video']   = video
+    Dict[url]['type']    = type
+    
+    item = Dict[url]
+  
+    return ObjectContainer(
+        header = unicode(item['title']),
+        message = 'Added to Favorites'
+    )
+        
+##########################################################################################
+@route(PREFIX + '/ManageChoice')
+def ManageChoice(key):
+    if not key in Dict:
+        return ObjectContainer() # Fix for Plex/Web
+        
+    oc = ObjectContainer(no_history = True, no_cache = True)
+        
+    item = Dict[key]    
+
+    oc.add(
+        PopupDirectoryObject(
+            key =
+                Callback(
+                    ConfirmDeleteFavorite,
+                    key = key
+                ),
+            title = 'Delete ' + item['title'],
             thumb = R(ICON)
         )
     )
     
-    title = "Results for '%s' in Audio Archive" % query
+    oc.add(
+        InputDirectoryObject(
+            key = Callback(RenameFavorite, key = key, title = item['title']),
+            title  = 'Rename ' + item['title'],
+            prompt = item['title'],
+            thumb = R(ICON)
+        )
+    )
+          
+    return oc
+    
+##########################################################################################
+@route(PREFIX + '/ConfirmDeleteFavorite')
+def ConfirmDeleteFavorite(key):
+    if not key in Dict:
+        return ObjectContainer() # Fix for Plex/Web
+        
+    oc = ObjectContainer(title2 = 'Delete', no_history = True, no_cache = True)
+    
     oc.add(
         DirectoryObject(
             key =
                 Callback(
-                    Objects,
-                    url = searchURLAudio,
-                    title = title, 
-                    video = False
+                    DeleteFavorite,
+                    key = key
                 ),
-            title = title,
+            title = 'Confirm Delete',
+            thumb = R(ICON)
+        )
+    )
+    
+    oc.add(
+        DirectoryObject(
+            key =
+                Callback(
+                    MessageBox,
+                    header = 'Deletion cancelled',
+                    message = 'No deletion performed'
+                ),
+            title = 'Cancel',
             thumb = R(ICON)
         )
     )
     
     return oc
+    
+##########################################################################################
+@route(PREFIX + '/MessageBox')
+def MessageBox(header, message):
+    return ObjectContainer(
+        replace_parent = True,
+        header = header,
+        message = message
+    )
+
+##########################################################################################
+@route(PREFIX + '/RenameFavorite')
+def RenameFavorite(query, key, title):
+    if not key in Dict:
+        return ObjectContainer() # Fix for Plex/Web
+
+    oc = ObjectContainer()
+    
+    Dict[key]['title'] = query
+    
+    return MessageBox(
+        header = 'Renamed',
+        message = title + ' to ' + query
+    )
+    
+##########################################################################################
+@route(PREFIX + '/DeleteFavorite')
+def DeleteFavorite(key):
+    if not key in Dict:
+        return ObjectContainer() # Fix for Plex/Web
+        
+    title = Dict[key]['title']
+    del Dict[key]
+        
+    return MessageBox(
+        header = 'Deletion completed',
+        message = 'Deleted ' + title
+    )
 
