@@ -7,6 +7,8 @@ BASE_URL = "http://archive.org"
 
 MAX_KEYWORDS_PER_PAGE = 1500
 
+AUDIO_ARCHIVE_DISABLED = "NOTE! The Audio Archive has been temporarily disabled but will be back up as soon as a solution to the problem is found"
+
 ##########################################################################################
 def Start():
     # Setup the default attributes for the ObjectContainer
@@ -37,22 +39,31 @@ def MainMenu():
         )
     )
 
-    title = "Audio Archive"
+    title = "UNAVAILABLE: Audio Archive"
     oc.add(
         DirectoryObject(
-            key = 
-                Callback(
-                    Subcollections,
-                    url = BASE_URL + '/details/audio',
-                    title = title,
-                    video = False,
-                    thumb = R(ICON)
-                ),
+            key = Callback(TemporarilyDisabled),
             title = title,
             thumb = R(ICON),
-            summary = "Welcome to the Archive's audio and MP3 library. This library contains over two hundred thousand free digital recordings ranging from alternative news programming, to Grateful Dead concerts, to Old Time Radio shows, to book and poetry readings, to original music uploaded by our users."                    
+            summary = AUDIO_ARCHIVE_DISABLED
         )
     )
+#     title = "Audio Archive"
+#     oc.add(
+#         DirectoryObject(
+#             key = 
+#                 Callback(
+#                     Subcollections,
+#                     url = BASE_URL + '/details/audio',
+#                     title = title,
+#                     video = False,
+#                     thumb = R(ICON)
+#                 ),
+#             title = title,
+#             thumb = R(ICON),
+#             summary = "Welcome to the Archive's audio and MP3 library. This library contains over two hundred thousand free digital recordings ranging from alternative news programming, to Grateful Dead concerts, to Old Time Radio shows, to book and poetry readings, to original music uploaded by our users."                    
+#         )
+#     )
     
     title = "Favorites"
     oc.add(
@@ -81,6 +92,16 @@ def MainMenu():
             summary = 'Search the Internet Archive'
         )
     )
+    
+    return oc
+
+##########################################################################################
+@route(PREFIX + '/TemporarilyDisabled')
+def TemporarilyDisabled():
+    oc = ObjectContainer()
+    
+    oc.header  = "Sorry"
+    oc.message = AUDIO_ARCHIVE_DISABLED
     
     return oc
 
@@ -157,13 +178,21 @@ def Favorites():
                 )
             else:
                 oc.add(
-                    AlbumObject(
-                        url = item['url'],
-                        title = item['title'],
-                        summary = item['summary'],
-                        thumb = item['thumb']                 
+                    DirectoryObject(
+                        key = Callback(TemporarilyDisabled),
+                        title = 'UNAVAILABLE: ' + item['title'],
+                        thumb = item['thumb'],
+                        summary = AUDIO_ARCHIVE_DISABLED
                     )
                 )
+#                 oc.add(
+#                     AlbumObject(
+#                         url = item['url'],
+#                         title = item['title'],
+#                         summary = item['summary'],
+#                         thumb = item['thumb']                 
+#                     )
+#                 )
         
     return oc
     
