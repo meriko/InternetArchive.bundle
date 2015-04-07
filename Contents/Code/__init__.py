@@ -3,80 +3,52 @@ ART    = 'art-default.jpg'
 ICON   = 'icon-default.png'
 PREFIX = '/video/internetarchive'
 
-BASE_URL = "http://archive.org"
+BASE_URL = "https://archive.org"
 
-MAX_KEYWORDS_PER_PAGE = 1500
+MOVING_IMAGE_IMG = 'https://ia902708.us.archive.org/3/items/movies/movies.png'
+AUDIO_ARCHIVE_IMG = 'https://ia902704.us.archive.org/6/items/audio/audio.png'
+IMAGE_IMG = 'https://ia600508.us.archive.org/12/items/image/image.png'
 
-AUDIO_ARCHIVE_DISABLED = "NOTE! The Audio Archive has been temporarily disabled but will be back up as soon as a solution to the problem is found"
+SUPPORTED_MEDIA_TYPES = ['collections', 'movies', 'audio', 'concerts', 'images']
+
+MAIN_MENU_ITEMS = [
+    {'title': "Moving Image Archive", 'url': '/details/movies', 'thumb': MOVING_IMAGE_IMG, 'description': "Welcome to the Archive's Moving Images library of free movies, films, and videos. This library contains over a million digital movies uploaded by Archive users which range from classic full-length films, to daily alternative news broadcasts, to cartoons and concerts."},
+    {'title': "Audio Archive", 'url': '/details/audio', 'thumb': AUDIO_ARCHIVE_IMG, 'description': "Welcome to the Archive's audio and MP3 library. This library contains over two hundred thousand free digital recordings ranging from alternative news programming, to Grateful Dead concerts, to Old Time Radio shows, to book and poetry readings, to original music uploaded by our users."},
+    {'title': "Images", 'url': '/details/image', 'thumb': IMAGE_IMG, 'description': "This library contains digital images uploaded by Archive users which range from maps to astronomical imagery to photographs of artwork. Many of these images are available for free download."},
+]
+
+ITEMS_PER_PAGE = 75
 
 ##########################################################################################
 def Start():
+    
     # Setup the default attributes for the ObjectContainer
     ObjectContainer.title1 = TITLE
-    ObjectContainer.art    = R(ART)
+    ObjectContainer.art = R(ART)
 
     HTTP.CacheTime = CACHE_1HOUR
     
 ##########################################################################################
 @handler(PREFIX, TITLE, thumb = ICON, art = ART)
 def MainMenu():
+    
     oc = ObjectContainer()
     
-    title = "Moving Image Archive"
-    oc.add(
-        DirectoryObject(
-            key = 
-                Callback(
-                    Subcollections,
-                    url = BASE_URL + '/details/movies',
-                    title = title,
-                    video = True,
-                    thumb = R(ICON)
-                ),
-            title = title,
-            thumb = R(ICON),
-            summary = "Welcome to the Archive's Moving Images library of free movies, films, and videos. This library contains over a million digital movies uploaded by Archive users which range from classic full-length films, to daily alternative news broadcasts, to cartoons and concerts."
+    for item in MAIN_MENU_ITEMS:
+        oc.add(
+            DirectoryObject(
+                key = 
+                    Callback(
+                        BrowseChoice,
+                        url = BASE_URL + item['url'],
+                        title = item['title'],
+                        thumb = item['thumb']
+                    ),
+                title = item['title'],
+                thumb = item['thumb'],
+                summary = item['description']
+            )
         )
-    )
-
-    title = "UNAVAILABLE: Audio Archive"
-    oc.add(
-        DirectoryObject(
-            key = Callback(TemporarilyDisabled),
-            title = title,
-            thumb = R(ICON),
-            summary = AUDIO_ARCHIVE_DISABLED
-        )
-    )
-#     title = "Audio Archive"
-#     oc.add(
-#         DirectoryObject(
-#             key = 
-#                 Callback(
-#                     Subcollections,
-#                     url = BASE_URL + '/details/audio',
-#                     title = title,
-#                     video = False,
-#                     thumb = R(ICON)
-#                 ),
-#             title = title,
-#             thumb = R(ICON),
-#             summary = "Welcome to the Archive's audio and MP3 library. This library contains over two hundred thousand free digital recordings ranging from alternative news programming, to Grateful Dead concerts, to Old Time Radio shows, to book and poetry readings, to original music uploaded by our users."                    
-#         )
-#     )
-    
-    title = "Favorites"
-    oc.add(
-        DirectoryObject(
-            key = 
-                Callback(
-                    Favorites
-                ),
-            title = title,
-            thumb = R(ICON),
-            summary = "All your favorites gathered for fast access"                    
-        )
-    )
     
     title = "Search"
     oc.add(
@@ -96,674 +68,369 @@ def MainMenu():
     return oc
 
 ##########################################################################################
-@route(PREFIX + '/TemporarilyDisabled')
-def TemporarilyDisabled():
-    oc = ObjectContainer()
+@route(PREFIX + '/BrowseChoice')
+def BrowseChoice(url, title, thumb):
     
-    oc.header  = "Sorry"
-    oc.message = AUDIO_ARCHIVE_DISABLED
+    oc = ObjectContainer(title2 = title)
+    pageElement = HTML.ElementFromURL(url)
     
-    return oc
+    for item in pageElement.xpath("//*[@class='facet-mediatype']//a"):
+        try:
+            if item.xpath(".//span/text()")[0].strip() in SUPPORTED_MEDIA_TYPES:
+                media_type = item.xpath(".//span/text()")[0].strip()
+            else:
+                continue
+        except:
+            continue
+            
+        url = BASE_URL + item.xpath("./@href")[0]
+
+        if media_type in ['audio', 'concerts']:
+            thumb = AUDIO_ARCHIVE_IMG
+            
+        elif media_type in ['movies']:
+            thumb = MOVING_IMAGE_IMG
+        
+        elif media_type in ['images']:
+            thumb = IMAGE_IMG
+        
+        oc.add(
+            DirectoryObject(
+                key =
+                    Callback(
+                        SortChoice,
+                        url = url,
+                        title = media_type.title(),
+                        thumb = thumb,
+                        media_type = media_type
+                    ),
+                title = media_type.title(),
+                thumb = thumb
+            )
+        )
+
+    if len(oc) == 1:
+        return SortChoice(
+            url = url,
+            title = media_type.title(),
+            thumb = thumb,
+            media_type = media_type
+        )
+    else:
+        return oc
 
 ##########################################################################################
-@route(PREFIX + '/Favorites')
-def Favorites():
-    if not Dict:
-        return ObjectContainer(
-            header = "No favorites found",
-            message = "After adding favorites, they will show up here"
+@route(PREFIX + '/SortChoice')
+def SortChoice(url, title, thumb, media_type):
+    
+    oc = ObjectContainer(title2 = title)
+    
+    title = 'Most Popular'
+    if media_type == 'collections':
+        oc.add(
+            DirectoryObject(
+                key =
+                    Callback(
+                        Collections,
+                        url = url,
+                        title = media_type.title(),
+                        thumb = thumb,
+                        sort = '-downloads'
+                    ),
+                title = title,
+                thumb = thumb
+            )    
         )
-    
-    oc = ObjectContainer(title2 = 'Favorites', no_cache = True)
-    
-    title = "Manage Favorites"
+    else:
+        oc.add(
+            DirectoryObject(
+                key =
+                    Callback(
+                        Items,
+                        url = url,
+                        title = media_type.title(),
+                        thumb = thumb,
+                        sort = '-downloads',
+                        media_type = media_type
+                    ),
+                title = title,
+                thumb = thumb
+            )
+        )
+
+    title = 'Recently Added'
+    if media_type == 'collections':
+        oc.add(
+            DirectoryObject(
+                key =
+                    Callback(
+                        Collections,
+                        url = url,
+                        title = media_type.title(),
+                        thumb = thumb,
+                        sort = '-date'
+                    ),
+                title = title,
+                thumb = thumb
+            )    
+        )
+    else:
+        oc.add(
+            DirectoryObject(
+                key =
+                    Callback(
+                        Items,
+                        url = url,
+                        title = media_type.title(),
+                        thumb = thumb,
+                        sort = '-date',
+                        media_type = media_type
+                    ),
+                title = title,
+                thumb = thumb
+            )
+        )
+        
+    title = 'A - Z'
     oc.add(
         DirectoryObject(
-            key = 
+            key =
                 Callback(
-                    ManageFavorites
+                    AToZ,
+                    url = url,
+                    title =  media_type.title(),
+                    thumb = thumb,
+                    media_type = media_type
                 ),
             title = title,
-            thumb = R(ICON),
-            summary = "Delete or rename your favorites"                    
+            thumb = thumb
         )
     )
     
-    for key in Dict:
-        item = Dict[key]
+    return oc
+    
+##########################################################################################
+@route(PREFIX + '/AToZ')
+def AToZ(url, title, thumb, media_type):
 
-        if item['type'] == 0:
-           oc.add(
+    oc = ObjectContainer(title2 = title)
+    
+    if not '?' in url:
+        url_to_request = url + "?sort=titleSorter"
+    else:
+        url_to_request = url + "&sort=titleSorter"
+    
+    pageElement = HTML.ElementFromURL(url_to_request)
+    
+    for item in pageElement.xpath("//*[@class='range-maker']//td"):
+        try:
+            url = BASE_URL + item.xpath(".//a/@href")[0]
+        except:
+            continue
+
+        title = item.xpath(".//a/text()")[0]
+        summary = item.xpath(".//a/@title")[0]
+        
+        if media_type == 'collections':
+            oc.add(
                 DirectoryObject(
                     key =
                         Callback(
-                            Subcollections,
-                            url = item['url'],
-                            title = item['title'],
-                            video = item['video'],
-                            thumb = item['thumb'],
-                            summary = item['summary']
+                            Collections,
+                            url = url,
+                            title = title,
+                            thumb = thumb,
+                            sort = 'titleSorter'
                         ),
-                    title = item['title'],
-                    thumb = item['thumb'],
-                    summary = item['summary']
-                )
-            )
-        elif item['type'] == 1:
+                    title = title + ' (%s)' % summary,
+                    thumb = thumb
+                )    
+            )     
+        else:
             oc.add(
                 DirectoryObject(
                     key =
                         Callback(
                             Items,
-                            url = item['url'],
-                            title = item['title'],
-                            video = item['video'],
-                            thumb = item['thumb'],
-                            summary = item['summary']
+                            url = url,
+                            title = title,
+                            thumb = thumb,
+                            media_type = media_type,
+                            sort = 'titleSorter'
                         ),
-                    title = item['title'],
-                    thumb = item['thumb'],
-                    summary = item['summary']
+                    title = title + ' (%s)' % summary,
+                    thumb = thumb
                 )
             )
-        elif item['type'] == 2:
-            if item['video']:   
-                oc.add(
-                    VideoClipObject(
-                        url = item['url'],
-                        title = item['title'],
-                        summary = item['summary'],
-                        thumb = item['thumb']
-                    )
-                )
-            else:
-                oc.add(
-                    DirectoryObject(
-                        key = Callback(TemporarilyDisabled),
-                        title = 'UNAVAILABLE: ' + item['title'],
-                        thumb = item['thumb'],
-                        summary = AUDIO_ARCHIVE_DISABLED
-                    )
-                )
-#                 oc.add(
-#                     AlbumObject(
-#                         url = item['url'],
-#                         title = item['title'],
-#                         summary = item['summary'],
-#                         thumb = item['thumb']                 
-#                     )
-#                 )
-        
+    
     return oc
-    
-##########################################################################################
-@route(PREFIX + '/ManageFavorites')
-def ManageFavorites():
-    if not Dict:
-        return ObjectContainer(
-            header = "No favorites found",
-            message = "Nothing to manage"
-        )
-    
-    oc = ObjectContainer(title2 = 'Manage Favorites', no_cache = True)
-    
-    for key in Dict:
-        item = Dict[key]
 
+##########################################################################################
+@route(PREFIX + '/Collections', page = int)
+def Collections(url, title, thumb, sort = '-downloads', page = 1):
+    
+    oc = ObjectContainer(title2 = title)
+    
+    if not '?' in url:
+        url_to_request = url + "?sort=%s&page=%s" % (sort, page)
+    else:
+        url_to_request = url + "&sort=%s&page=%s" % (sort, page)
+    
+    org_url = url
+    org_title = title
+    org_thumb = thumb
+    
+    pageElement = HTML.ElementFromURL(url_to_request)
+  
+    # Try to find collections
+    for item in pageElement.xpath("//*[contains(@class,'collection-ia')]"):
+        url = BASE_URL + item.xpath(".//a/@href")[0]
+        title = item.xpath(".//*[contains(@class,'collection-title')]//div/text()")[0].strip()
+        
+        try:
+            thumb = '/services/img/' + item.xpath("./@data-id")[0]
+
+            if not thumb.startswith("http"):
+                thumb = BASE_URL + thumb
+        except:
+            thumb = org_thumb
+            
+        try:
+            itemCount = item.xpath(".//*[contains(@class,'collection-stats')]//*[contains(@class,'num-items')]/text()")[0].strip()
+            extra     = " (" + itemCount + ")"
+        except:
+            extra = ""
+        
         oc.add(
             DirectoryObject(
                 key =
                     Callback(
-                        ManageChoice,
-                        key = key
+                        BrowseChoice,
+                        url = url,
+                        title = title,
+                        thumb = thumb
                     ),
-                title = item['title'],
-                thumb = R(ICON),
-                summary = "Delete or rename " + item['title']
+                title = title + extra,
+                thumb = thumb
+            )
+        )         
+
+    if len(oc) < 1:
+        oc.header  = "Sorry"
+        oc.message = "Could not find any content"
+    
+    elif len(oc) >= ITEMS_PER_PAGE:
+        oc.add(
+            NextPageObject(
+                key =
+                    Callback(
+                        Collections,
+                        url = org_url,
+                        title = org_title,
+                        thumb = org_thumb,
+                        page = page + 1
+                    ),
+                thumb = org_thumb
             )
         )
+        
+    return oc
+
+##########################################################################################
+@route(PREFIX + '/Items', page = int)
+def Items(url, title, thumb, media_type, sort = '-downloads', page = 1):
+
+    oc = ObjectContainer(title2 = title)
+    org_url = url
+    org_title = title
+    org_thumb = thumb
+
+    if not '?' in url:
+        url_to_request = url + "?sort=%s&page=%s" % (sort, page)
+    else:
+        url_to_request = url + "&sort=%s&page=%s" % (sort, page)
+   
+    pageElement = HTML.ElementFromURL(url_to_request)
+  
+    for item in pageElement.xpath("//*[contains(@class,'item-ia')]"):
+        url   = BASE_URL + "/details/" + item.xpath("./@data-id")[0]
+        title = item.xpath(".//*[contains(@class,'ttl')]//a/@title")[0].strip()
+        
+        try:
+            thumb = '/services/img/' + item.xpath("./@data-id")[0]
+
+            if not thumb.startswith("http"):
+                thumb = BASE_URL + thumb
+        except:
+            thumb = org_thumb
+            
+        try:
+            summary = item.xpath(".//span/@title")[0].strip()
+        except:
+            summary = None
+        
+        if media_type == 'movies':
+            oc.add(
+                EpisodeObject(
+                    url = url,
+                    show = summary,
+                    title = title,
+                    thumb = thumb,
+                    summary = summary
+                )
+            )
+
+        elif media_type in ['audio', 'concerts']:
+            oc.add(
+                Album(
+                    url = url,
+                    title = title,
+                    thumb = thumb,
+                    summary = summary,
+                    artist = summary
+                )
+            )
+        
+        elif media_type == 'images':
+            oc.add(
+                PhotoAlbumObject(
+                    url = url,
+                    title = title,
+                    thumb = thumb,
+                    summary = summary
+                )
+            )
+
+    if len(oc) < 1:
+        oc.header  = "Sorry"
+        oc.message = "Could not find any content"
     
+    elif len(oc) >= ITEMS_PER_PAGE:
+        oc.add(
+            NextPageObject(
+                key =
+                    Callback(
+                        Items,
+                        url = org_url,
+                        title = org_title,
+                        thumb = org_thumb,
+                        media_type = media_type,
+                        sort = sort,
+                        page = page + 1
+                    ),
+                thumb = org_thumb
+            )
+        )
+        
     return oc
 
 ##########################################################################################
 @route(PREFIX + '/Search', video = bool, offset = int)
 def Search(query, title):
-    oc = ObjectContainer(title2 = title)
     
-    searchURLMovies = BASE_URL + '/search.php?query=' + String.Quote(query) + '%20AND%20mediatype%3Amovies'
-    searchURLAudio  = BASE_URL + '/search.php?query=' + String.Quote(query) + '%20AND%20mediatype%3Aaudio'
-    
-    title = "Results for '%s' in Moving Image Archive" % query
-    oc.add(
-        DirectoryObject(
-            key =
-                Callback(
-                    Items,
-                    url = searchURLMovies,
-                    title = title, 
-                    video = True
-                ),
-            title = title,
-            thumb = R(ICON)
-        )
-    )
-    
-    title = "Results for '%s' in Audio Archive" % query
-    oc.add(
-        DirectoryObject(
-            key =
-                Callback(
-                    Items,
-                    url = searchURLAudio,
-                    title = title, 
-                    video = False
-                ),
-            title = title,
-            thumb = R(ICON)
-        )
-    )
-    
-    return oc
-
-##########################################################################################
-@route(PREFIX + '/Subcollections', video = bool)
-def Subcollections(url, title, video, summary = None, thumb = None):
-    oc = ObjectContainer(title2 = title, no_cache = True)
-    
-    orgTitle = title
-    orgUrl   = url
-    orgThumb = thumb
-    orgDesc  = summary
-    
-    pageElement = HTML.ElementFromURL(url)
-    
-    # Add spotlight item
-    try:
-        for item in pageElement.xpath("//*[@id='spotlight']"):
-            link = BASE_URL + item.xpath(".//a/@href")[0]
-            
-            name = "Spotlight Item"
-            try:
-                 name = name + " - '" + item.xpath(".//a/text()")[0] + "'"
-            except:
-                pass
-            
-            try:
-                thumb = item.xpath(".//img/@src")[0]
-            
-                if not thumb.startswith("http"):
-                    thumb = BASE_URL + thumb
-            except:
-                thumb = None
-                
-            try:
-                desc = item.xpath(".//text()[preceding-sibling::br or following-sibling::br]")[0]
-            except:
-                desc = None
-
-        oc.add(
-            PopupDirectoryObject(
-                key =
-                    Callback(
-                        PlayChoice,
-                        url = link,
-                        title = name,
-                        summary = desc,
-                        thumb = thumb,
-                        video = video
-                    ),
-                title = name,
-                summary = desc,
-                thumb = thumb
-            )
-        )
-          
-    except:
-        pass
-
-    # Try to find subcollections
-    anySubCollectionFound = False
-    
-    for item in pageElement.xpath("//*[@id='subcollections']//tr"):
-        anySubCollectionFound = True
-        
-        url   = BASE_URL + item.xpath(".//a/@href")[0]
-        title = item.xpath(".//a/text()")[0]
-        
-        try:
-            thumb = item.xpath(".//img/@src")[0]
-            
-            if not thumb.startswith("http"):
-                thumb = BASE_URL + thumb
-        except:
-            thumb = R(ICON)
-        
-        try:
-            desc = item.xpath(".//div/text()")[0]
-        except:
-            desc = None
-            
-        try:
-            itemCount = item.xpath(".//nobr/text()")[0]
-            extra     = " (" + itemCount + ")"
-        except:
-            pass
-        
-        oc.add(
-            DirectoryObject(
-                key =
-                    Callback(
-                        Subcollections,
-                        url = url,
-                        title = title,
-                        video = video,
-                        summary = desc,
-                        thumb = thumb
-                    ),
-                title = title + extra,
-                summary = desc,
-                thumb = thumb,
-            )
-        )
-    
-    # If no subcollections were found, try to find the browse choices
-    if not anySubCollectionFound:
-        for item in pageElement.xpath("//*[@id='description']//a"):
-            ref = item.xpath("./@href")[0]
-
-            if ref.startswith("/browse.php") or \
-               ref.startswith("/search.php"):
-               
-                url = BASE_URL + ref
-                choice = item.xpath("./text()")[0]
-
-                oc.add(
-                    DirectoryObject(
-                        key =
-                            Callback(
-                                Items,
-                                url = url,
-                                title = title + ' ' + choice,
-                                video = video,
-                                thumb = orgThumb
-                            ),
-                        title = choice,
-                        thumb = orgThumb
-                    )
-                )           
-
-
-    if len(oc) < 1:
-        oc.header  = "Sorry"
-        oc.message = "Could not find any content"
-    else:
-        if not orgUrl in Dict:
-            oc.objects.insert(
-                0,
-                DirectoryObject(
-                    key = 
-                        Callback(
-                            AddFavorite,
-                            url = orgUrl,
-                            title = orgTitle,
-                            video = video,
-                            type = 0,
-                            summary = orgDesc,
-                            thumb = orgThumb
-                        ),
-                    title = 'Add to Favorites',
-                    thumb = orgThumb,
-                    summary = 'Add this section to Favorites'
-                )
-            )
-        
-    return oc
-
-##########################################################################################
-@route(PREFIX + '/Items', video = bool, offset = int)
-def Items(url, title, video, offset = 0, summary = None, thumb = None):
-    oc = ObjectContainer(title2 = title, no_cache = True)
-    
-    orgTitle = title
-    orgUrl   = url
-    orgDesc  = summary
-    orgThumb = thumb
-    
-    pageElement = HTML.ElementFromURL(url)
-        
-    for item in pageElement.xpath("//*[@class='hitRow']"):
-        url = BASE_URL + item.xpath(".//a[@class='titleLink']/@href")[0]
-        
-        title = ''
-        for text in item.xpath(".//a[@class='titleLink']//text()"):
-            title = title + ' ' + text
-        
-        try:
-            thumb = item.xpath(".//td[@class='thumbCell']//img/@src")[0]
-            
-            if not thumb.startswith("http"):
-                thumb = BASE_URL + thumb
-
-        except:
-            thumb = R(ICON)
-            
-        try:
-            summary = ''
-            for text in item.xpath(".//td[@class='hitCell']//text()"):
-                summary = summary + ' ' + text
-        
-            summary = summary.replace(title, '')
-        
-        except:
-            summary = None
-        
-        title = title.strip().lstrip("[").rstrip("]")
-        
-        oc.add(
-            PopupDirectoryObject(
-                key =
-                    Callback(
-                        PlayChoice,
-                        url = url,
-                        title = title,
-                        summary = summary,
-                        thumb = thumb,
-                        video = video
-                    ),
-                title = title,
-                summary = summary,
-                thumb = thumb
-            )
-        )
-
-    # If no videoclips or audiotracks were found
-    # search for browse items(usually originating from "Browse by Subject/Keyword")
-    if len(oc) < 1:
-        counter = 0
-        
-        for item in pageElement.xpath("//*[@id='browse']//li"):
-            try:
-                ref = item.xpath(".//a/@href")[0]
-            except:
-                continue
-            
-            if ref.startswith("/search.php"):
-                try:
-                    title = item.xpath(".//a/text()")[0]
-                except:
-                    continue
-                    
-                counter = counter + 1
-                if counter <= offset:
-                    continue
-                    
-                try:
-                    title = title + " " + item.xpath("./text()")[0]
-                except:
-                    pass
-            
-                oc.add(
-                    DirectoryObject(
-                        key =
-                            Callback(
-                                Items,
-                                url = BASE_URL + ref,
-                                title = title,
-                                video = video
-                            ),
-                        title = title
-                    )
-                )
-                
-                if counter - offset >= MAX_KEYWORDS_PER_PAGE:
-                    oc.add(
-                        NextPageObject(
-                            key = 
-                                Callback(
-                                    Items,
-                                    url = url,
-                                    title = oc.title2,
-                                    video = video,
-                                    offset = counter
-                                ),
-                            title = "Next..."
-                        )
-                    )
-                    break
-    
-    else:    
-        # Check for pagination
-        try:
-            for item in pageElement.xpath("//*[@class='pageRow']//a"):
-                if 'next' in item.xpath("./text()")[0].lower():
-                    url = BASE_URL + item.xpath("./@href")[0]
-                    oc.add(
-                        NextPageObject(
-                            key = 
-                                Callback(
-                                    Items,
-                                    url = url,
-                                    title = oc.title2,
-                                    video = video
-                                ),
-                            title = "Next..."
-                        )
-                    )
-                    break
-        except:
-            pass
-    
-    if len(oc) < 1:
-        oc.header  = "Sorry"
-        oc.message = "Could not find any content"
-    elif len(oc) > 1:
-        if not orgUrl in Dict and offset == 0:            
-            oc.objects.insert(
-                0,
-                DirectoryObject(
-                    key = 
-                        Callback(
-                            AddFavorite,
-                            url = orgUrl,
-                            title = orgTitle,
-                            video = video,
-                            type = 1,
-                            summary = orgDesc,
-                            thumb = orgThumb
-                        ),
-                    title = 'Add to Favorites',
-                    thumb = orgThumb,
-                    summary = 'Add this section to Favorites'
-                )
-            )
-
-    return oc
-
-##########################################################################################
-@route(PREFIX + '/PlayChoice', video = bool)
-def PlayChoice(url, title, summary, thumb, video):
-    oc = ObjectContainer()
-    
-    oc.add(
-        DirectoryObject(
-            key =
-                Callback(
-                    PlayableObject,
-                    url = url,
-                    title = title,
-                    summary = summary,
-                    thumb = thumb,
-                    video = video
-                ),
-            title = 'Play',
-        )
-    )
-    
-    oc.add(
-        DirectoryObject(
-            key = 
-                Callback(
-                    AddFavorite,
-                        url = url,
-                        title = title,
-                        video = video,
-                        type = 2,
-                        summary = summary,
-                        thumb = thumb
-                ),
-            title = 'Add to Favorites'
-        )
-    )
-    
-    return oc
-
-##########################################################################################
-@route(PREFIX + '/PlayableObject', video = bool)
-def PlayableObject(url, title, summary, thumb, video):
-    oc = ObjectContainer()
-    
-    if video:   
-        oc.add(
-            VideoClipObject(
-                url = url + "#video",
-                title = title,
-                summary = summary,
-                thumb = thumb
-            )
-        )
-    else:
-        oc.add(
-            AlbumObject(
-                url = url,
-                title = title,
-                summary = summary,
-                thumb = thumb                   
-            )
-        )
-    
-    return oc
-
-##########################################################################################
-@route(PREFIX + '/AddFavorite', video = bool, type = int)
-def AddFavorite(url, title, video, type, summary = None, thumb = None):        
-    Dict[url]            = {}  
-    Dict[url]['title']   = title
-    Dict[url]['url']     = url
-    Dict[url]['summary'] = summary
-    Dict[url]['thumb']   = thumb
-    Dict[url]['video']   = video
-    Dict[url]['type']    = type
-    
-    item = Dict[url]
-  
-    return ObjectContainer(
-        header = unicode(item['title']),
-        message = 'Added to Favorites'
-    )
-        
-##########################################################################################
-@route(PREFIX + '/ManageChoice')
-def ManageChoice(key):
-    if not key in Dict:
-        return ObjectContainer() # Fix for Plex/Web
-        
-    oc = ObjectContainer(no_history = True, no_cache = True)
-        
-    item = Dict[key]    
-
-    oc.add(
-        PopupDirectoryObject(
-            key =
-                Callback(
-                    ConfirmDeleteFavorite,
-                    key = key
-                ),
-            title = 'Delete ' + item['title'],
-            thumb = R(ICON)
-        )
-    )
-    
-    oc.add(
-        InputDirectoryObject(
-            key = Callback(RenameFavorite, key = key, title = item['title']),
-            title  = 'Rename ' + item['title'],
-            prompt = item['title'],
-            thumb = R(ICON)
-        )
-    )
-          
-    return oc
-    
-##########################################################################################
-@route(PREFIX + '/ConfirmDeleteFavorite')
-def ConfirmDeleteFavorite(key):
-    if not key in Dict:
-        return ObjectContainer() # Fix for Plex/Web
-        
-    oc = ObjectContainer(title2 = 'Delete', no_history = True, no_cache = True)
-    
-    oc.add(
-        DirectoryObject(
-            key =
-                Callback(
-                    DeleteFavorite,
-                    key = key
-                ),
-            title = 'Confirm Delete',
-            thumb = R(ICON)
-        )
-    )
-    
-    oc.add(
-        DirectoryObject(
-            key =
-                Callback(
-                    MessageBox,
-                    header = 'Deletion cancelled',
-                    message = 'No deletion performed'
-                ),
-            title = 'Cancel',
-            thumb = R(ICON)
-        )
-    )
-    
-    return oc
-    
-##########################################################################################
-@route(PREFIX + '/MessageBox')
-def MessageBox(header, message):
-    return ObjectContainer(
-        replace_parent = True,
-        header = header,
-        message = message
-    )
-
-##########################################################################################
-@route(PREFIX + '/RenameFavorite')
-def RenameFavorite(query, key, title):
-    if not key in Dict:
-        return ObjectContainer() # Fix for Plex/Web
-
-    oc = ObjectContainer()
-    
-    Dict[key]['title'] = query
-    
-    return MessageBox(
-        header = 'Renamed',
-        message = title + ' to ' + query
-    )
-    
-##########################################################################################
-@route(PREFIX + '/DeleteFavorite')
-def DeleteFavorite(key):
-    if not key in Dict:
-        return ObjectContainer() # Fix for Plex/Web
-        
-    title = Dict[key]['title']
-    del Dict[key]
-        
-    return MessageBox(
-        header = 'Deletion completed',
-        message = 'Deleted ' + title
+    return BrowseChoice(
+        url = BASE_URL + '/search.php?query=' + String.Quote(query),
+        title = "Results for '%s'" % query,
+        thumb = R(ICON)
     )
 
