@@ -353,8 +353,11 @@ def Items(url, title, thumb, media_type, sort = '-downloads', page = 1):
     pageElement = HTML.ElementFromURL(url_to_request)
   
     for item in pageElement.xpath("//*[contains(@class,'item-ia')]"):
-        url   = BASE_URL + "/details/" + item.xpath("./@data-id")[0]
-        title = item.xpath(".//*[contains(@class,'ttl')]//a/@title")[0].strip()
+        try:
+            url   = BASE_URL + "/details/" + item.xpath("./@data-id")[0]
+            title = item.xpath(".//*[contains(@class,'ttl')]//a/@title")[0].strip()
+        except:
+            continue
         
         try:
             thumb = '/services/img/' + item.xpath("./@data-id")[0]
