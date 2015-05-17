@@ -385,7 +385,7 @@ def Items(url, title, thumb, media_type, sort = '-downloads', page = 1):
 
         elif media_type in ['audio', 'concerts']:
             oc.add(
-                Album(
+                AlbumObject(
                     url = url,
                     title = title,
                     thumb = thumb,
@@ -424,7 +424,7 @@ def Items(url, title, thumb, media_type, sort = '-downloads', page = 1):
                 thumb = org_thumb
             )
         )
-        
+
     return oc
 
 ##########################################################################################
