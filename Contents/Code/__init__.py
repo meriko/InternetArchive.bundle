@@ -74,7 +74,8 @@ def BrowseChoice(url, title, thumb):
     oc = ObjectContainer(title2 = title)
     pageElement = HTML.ElementFromURL(url)
     
-    for item in pageElement.xpath("//*[@class='facet-mediatype']//a"):
+    urls = []
+    for item in pageElement.xpath("//*[contains(@class,'facet-mediatype')]//a"):
         try:
             if item.xpath(".//span/text()")[0].strip() in SUPPORTED_MEDIA_TYPES:
                 media_type = item.xpath(".//span/text()")[0].strip()
@@ -84,6 +85,11 @@ def BrowseChoice(url, title, thumb):
             continue
             
         url = BASE_URL + item.xpath("./@href")[0]
+        
+        if url in urls:
+            continue
+        
+        urls.append(url)
 
         if media_type in ['audio', 'concerts']:
             thumb = AUDIO_ARCHIVE_IMG
@@ -222,7 +228,7 @@ def AToZ(url, title, thumb, media_type):
     
     pageElement = HTML.ElementFromURL(url_to_request)
     
-    for item in pageElement.xpath("//*[@class='range-maker']//td"):
+    for item in pageElement.xpath("//*[contains(@class,'range-maker')]//td"):
         try:
             url = BASE_URL + item.xpath(".//a/@href")[0]
         except:
@@ -285,7 +291,7 @@ def Collections(url, title, thumb, sort = '-downloads', page = 1):
     # Try to find collections
     for item in pageElement.xpath("//*[contains(@class,'collection-ia')]"):
         url = BASE_URL + item.xpath(".//a/@href")[0]
-        title = item.xpath(".//*[contains(@class,'collection-title')]//div/text()")[0].strip()
+        title = ''.join(item.xpath(".//*[contains(@class,'collection-title')]//a//text()")).strip()
         
         try:
             thumb = '/services/img/' + item.xpath("./@data-id")[0]
