@@ -75,7 +75,7 @@ def BrowseChoice(url, title, thumb):
     pageElement = HTML.ElementFromURL(url)
     
     urls = []
-    for item in pageElement.xpath("//*[contains(@class,'facet-mediatype')]//a"):
+    for item in pageElement.xpath("//*[contains(@class,'facet-mediatype')]//*[contains(@class,'farow')]"):
         try:
             if item.xpath(".//span/text()")[0].strip() in SUPPORTED_MEDIA_TYPES:
                 media_type = item.xpath(".//span/text()")[0].strip()
@@ -83,8 +83,8 @@ def BrowseChoice(url, title, thumb):
                 continue
         except:
             continue
-            
-        url = BASE_URL + item.xpath("./@href")[0]
+
+        url = BASE_URL + item.xpath(".//input/@onclick")[0].split("'")[1]
         
         if url in urls:
             continue
